@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast, { Toaster } from 'react-hot-toast'
 import { Client as Styletron } from 'styletron-engine-atomic'
@@ -16,7 +16,7 @@ import { detectLang, supportLanguages } from './lang'
 import { translate, TranslateMode } from './translate'
 import { Select, Value, Option } from 'baseui-sd/select'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
-import { RxCopy, RxSpeakerLoud } from 'react-icons/rx'
+import { RxCopy, RxReload, RxSpeakerLoud } from 'react-icons/rx'
 import { calculateMaxXY, queryPopupCardElement } from './utils'
 import { clsx } from 'clsx'
 import { Button } from 'baseui-sd/button'
@@ -251,6 +251,8 @@ const useStyles = createUseStyles({
     'errorMessage': {
         display: 'flex',
         color: 'red',
+        alignItems: 'center',
+        gap: '4px',
     },
     'actionButtonsContainer': {
         display: 'flex',
@@ -360,6 +362,8 @@ export interface MovementXY {
 }
 
 export function PopupCard(props: IPopupCardProps) {
+    const [translationFlag, forceTranslate] = useReducer((x: number) => x + 1, 0)
+
     const editorRef = useRef<HTMLTextAreaElement>(null)
     const isCompositing = useRef(false)
     const [selectedWord, setSelectedWord] = useState('')
@@ -679,8 +683,15 @@ export function PopupCard(props: IPopupCardProps) {
             const afterTranslate = (reason: string) => {
                 stopLoading()
                 if (reason !== 'stop') {
-                    setActionStr('Error')
-                    setErrorMessage(`${actionStr} failed: ${reason}`)
+                    if (reason == 'length') {
+                        toast(t('Chars Limited'), {
+                            duration: 5000,
+                            icon: '😥',
+                        })
+                    } else {
+                        setActionStr('Error')
+                        setErrorMessage(`${actionStr} failed: ${reason}`)
+                    }
                 } else {
                     let actionStr = actionStrItem.afterStr
                     if (translateMode === 'translate' && detectFrom == detectTo) {
@@ -759,7 +770,7 @@ export function PopupCard(props: IPopupCardProps) {
         return () => {
             controller.abort()
         }
-    }, [translateText, originalText, selectedWord])
+    }, [translateText, originalText, selectedWord, translationFlag])
 
     const handleSpeakDone = () => {
         setIsSpeakingEditableText(false)
@@ -1273,16 +1284,26 @@ export function PopupCard(props: IPopupCardProps) {
                                                 >
                                                     <div>{actionStr}</div>
                                                     {isLoading ? (
-                                                        <span className={styles.writing} />
+                                                        <span className={styles.writing} key={'1'} />
                                                     ) : errorMessage ? (
-                                                        <span>😢</span>
+                                                        <span key={'2'}>😢</span>
                                                     ) : (
-                                                        <span>👍</span>
+                                                        <span key={'3'}>👍</span>
                                                     )}
                                                 </div>
                                             )}
                                             {errorMessage ? (
-                                                <div className={styles.errorMessage}>{errorMessage}</div>
+                                                <div className={styles.errorMessage}>
+                                                    <span>{errorMessage}</span>
+                                                    <StatefulTooltip content={t('Retry')} showArrow placement='left'>
+                                                        <div
+                                                            onClick={() => forceTranslate()}
+                                                            className={styles.actionButton}
+                                                        >
+                                                            <RxReload size={13} />
+                                                        </div>
+                                                    </StatefulTooltip>
+                                                </div>
                                             ) : (
                                                 <div
                                                     style={{
